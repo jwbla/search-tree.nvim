@@ -20,7 +20,6 @@ function M.show_tree(tree_data, search_term, config)
   
   -- Create buffer if it doesn't exist
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
-    vim.notify("Creating new buffer", vim.log.levels.INFO)
     state.buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(state.buf, "search-tree")
     vim.api.nvim_buf_set_option(state.buf, "filetype", "search-tree")
@@ -29,8 +28,6 @@ function M.show_tree(tree_data, search_term, config)
     
     -- Setup keybindings
     M.setup_keybindings()
-  else
-    vim.notify("Reusing existing buffer", vim.log.levels.INFO)
   end
   
   -- Render tree
@@ -61,7 +58,6 @@ function M.show_tree(tree_data, search_term, config)
   
   -- Create or update window
   if not state.win or not vim.api.nvim_win_is_valid(state.win) then
-    vim.notify("Creating new window", vim.log.levels.INFO)
     -- Save the current window before creating the tree view
     state.previous_win = vim.api.nvim_get_current_win()
     
@@ -78,8 +74,6 @@ function M.show_tree(tree_data, search_term, config)
       vim.notify("ERROR: Window was not created!", vim.log.levels.ERROR)
       return
     end
-  else
-    vim.notify("Reusing existing window", vim.log.levels.INFO)
   end
   
   -- Set window options
@@ -87,8 +81,6 @@ function M.show_tree(tree_data, search_term, config)
   vim.api.nvim_win_set_option(state.win, "number", false)
   vim.api.nvim_win_set_option(state.win, "relativenumber", false)
   vim.api.nvim_win_set_option(state.win, "wrap", false)
-  
-  vim.notify("Tree view displayed successfully", vim.log.levels.INFO)
 end
 
 -- Create floating window
@@ -258,10 +250,8 @@ function M.toggle_all()
   -- If any are expanded, collapse all; otherwise expand all
   if any_expanded then
     collapse_all_dirs(state.tree_data, state.expanded_dirs)
-    vim.notify("Collapsed all directories", vim.log.levels.INFO)
   else
     expand_all_dirs(state.tree_data, state.expanded_dirs)
-    vim.notify("Expanded all directories", vim.log.levels.INFO)
   end
   
   -- Re-render

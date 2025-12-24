@@ -123,21 +123,13 @@ function M.search_async(term, opts, callback)
   
   table.insert(cmd_parts, term)
   
-  -- Convert to string command
-  local cmd_str = table.concat(cmd_parts, " ")
-  
-  vim.notify("Starting ripgrep: " .. cmd_str, vim.log.levels.INFO)
-  
   -- Use vim.system if available (Neovim 0.10+), otherwise fall back to jobstart
   if vim.system then
     vim.system(cmd_parts, {
       cwd = cwd,
       text = true,
     }, function(obj)
-      -- Schedule callback to run in main event loop (can't use vim.notify in fast event context)
       vim.schedule(function()
-        vim.notify("vim.system callback: exit=" .. obj.code .. ", stdout_lines=" .. #vim.split(obj.stdout or "", "\n"), vim.log.levels.INFO)
-        
         if obj.code == 1 then
           -- No matches
           callback({}, nil)
@@ -158,7 +150,6 @@ function M.search_async(term, opts, callback)
           end
         end
         
-        vim.notify("Parsed " .. #results .. " matches", vim.log.levels.INFO)
         callback(results, nil)
       end)
     end)
@@ -175,7 +166,6 @@ function M.search_async(term, opts, callback)
     stdout_buffered = true,
     stderr_buffered = true,
     on_stdout = function(_, data)
-      vim.notify("on_stdout: " .. #data .. " chunks", vim.log.levels.INFO)
       for _, line in ipairs(data) do
         if line ~= "" then
           table.insert(stdout, line)
@@ -183,7 +173,6 @@ function M.search_async(term, opts, callback)
       end
     end,
     on_stderr = function(_, data)
-      vim.notify("on_stderr: " .. #data .. " chunks", vim.log.levels.INFO)
       for _, line in ipairs(data) do
         if line ~= "" then
           table.insert(stderr, line)
@@ -191,7 +180,6 @@ function M.search_async(term, opts, callback)
       end
     end,
     on_exit = function(_, exit_code)
-      vim.notify("on_exit: code=" .. exit_code .. ", stdout=" .. #stdout .. " lines", vim.log.levels.INFO)
       if job_completed then
         return
       end
@@ -211,14 +199,11 @@ function M.search_async(term, opts, callback)
               table.insert(results, match)
             end
           end
-          vim.notify("Calling callback with " .. #results .. " results", vim.log.levels.INFO)
           callback(results, nil)
         end
       end)
     end,
   })
-  
-  vim.notify("jobstart returned: " .. job_id, vim.log.levels.INFO)
   
   if job_id <= 0 then
     callback({}, "Failed to start job: " .. job_id)

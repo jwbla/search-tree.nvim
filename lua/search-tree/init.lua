@@ -54,14 +54,8 @@ function M.search(term)
   local tree = require("search-tree.tree")
   local ui = require("search-tree.ui")
   
-  -- Show loading message
-  vim.notify("Searching for: " .. term, vim.log.levels.INFO)
-  
   -- Execute async search
-  vim.notify("Starting search for: " .. term, vim.log.levels.INFO)
   search.search_async(term, config.ripgrep or {}, function(results, err)
-    vim.notify("Callback called - results: " .. tostring(#results or 0) .. ", err: " .. tostring(err or "nil"), vim.log.levels.INFO)
-    
     if err then
       vim.notify("Search error: " .. err, vim.log.levels.ERROR)
       return
@@ -71,8 +65,6 @@ function M.search(term)
       vim.notify("No matches found for: " .. term, vim.log.levels.INFO)
       return
     end
-    
-    vim.notify("Building tree from " .. #results .. " results", vim.log.levels.INFO)
     
     -- Build tree structure
     local tree_structure = tree.build_tree(results)
@@ -91,12 +83,8 @@ function M.search(term)
       return
     end
     
-    vim.notify("Displaying tree", vim.log.levels.INFO)
-    
     -- Display tree
     ui.show_tree(sorted_tree, term, config)
-    
-    vim.notify(string.format("Found %d matches", #results), vim.log.levels.INFO)
   end)
 end
 
