@@ -10,67 +10,7 @@ local state = {
   search_term = "",
   config = {},
   previous_win = nil,  -- Track the window that was active before opening tree view
-  update_timer = nil,  -- Timer for debounced updates
-  is_searching = false, -- Track if search is in progress
 }
-
--- Update tree view (called incrementally during streaming)
-function M.update_tree()
-  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
-    return
-  end
-  
-  if not state.tree_data then
-    return
-  end
-  
-  -- Re-sort tree to ensure new items are in correct position
-  local tree = require("search-tree.tree")
-  local sorted_tree = tree.sort_tree(state.tree_data)
-  
-  -- Render tree
-  local render = require("search-tree.render")
-  local lines, highlights, line_map = render.render_tree(sorted_tree, state.expanded_files, state.expanded_dirs)
-  state.line_map = {}
-  
-  -- Convert line_map to 1-indexed table for easier lookup
-  for i, info in ipairs(line_map) do
-    state.line_map[i] = info
-  end
-  
-  -- Update buffer
-  vim.api.nvim_buf_set_option(state.buf, "modifiable", true)
-  vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(state.buf, "modifiable", false)
-  
-  -- Clear existing highlights
-  vim.api.nvim_buf_clear_namespace(state.buf, 0, 0, -1)
-  
-  -- Apply highlights
-  render.setup_highlights()
-  for _, hl in ipairs(highlights) do
-    local hl_group, line_num, start_col, end_col = hl[1], hl[2], hl[3], hl[4]
-    if start_col and end_col then
-      vim.api.nvim_buf_add_highlight(state.buf, 0, hl_group, line_num - 1, start_col, end_col)
-    else
-      vim.api.nvim_buf_add_highlight(state.buf, 0, hl_group, line_num - 1, 0, -1)
-    end
-  end
-end
-
--- Debounced update function
-function M.schedule_update()
-  -- Cancel existing timer
-  if state.update_timer then
-    vim.fn.timer_stop(state.update_timer)
-  end
-  
-  -- Schedule update after 100ms (debounce)
-  state.update_timer = vim.fn.timer_start(100, function()
-    M.update_tree()
-    state.update_timer = nil
-  end)
-end
 
 -- Create or update the tree view window
 function M.show_tree(tree_data, search_term, config)
@@ -141,102 +81,6 @@ function M.show_tree(tree_data, search_term, config)
   vim.api.nvim_win_set_option(state.win, "number", false)
   vim.api.nvim_win_set_option(state.win, "relativenumber", false)
   vim.api.nvim_win_set_option(state.win, "wrap", false)
-  
-  -- Initial render
-  M.update_tree()
-end
-
--- Initialize tree for streaming search
-function M.init_tree_for_streaming(search_term, config)
-  state.search_term = search_term
-  state.config = config
-  state.is_searching = true
-  
-  -- Initialize empty tree
-  state.tree_data = {
-    name = ".",
-    path = ".",
-    count = 0,
-    dirs = {},
-    files = {},
-  }
-  
-  -- Create buffer and window if they don't exist
-  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
-    state.buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(state.buf, "search-tree")
-    vim.api.nvim_buf_set_option(state.buf, "filetype", "search-tree")
-    vim.api.nvim_buf_set_option(state.buf, "buftype", "nofile")
-    vim.api.nvim_buf_set_option(state.buf, "modifiable", false)
-    
-    -- Setup keybindings
-    M.setup_keybindings()
-  end
-  
-  -- Create or update window
-  if not state.win or not vim.api.nvim_win_is_valid(state.win) then
-    state.previous_win = vim.api.nvim_get_current_win()
-    
-    local window_config = config.window or {}
-    local position = window_config.position or "float"
-    
-    if position == "float" then
-      M.create_float_window(window_config)
-    else
-      M.create_split_window(window_config)
-    end
-    
-    if not state.win then
-      vim.notify("ERROR: Window was not created!", vim.log.levels.ERROR)
-      return false
-    end
-  end
-  
-  -- Set window options
-  vim.api.nvim_win_set_buf(state.win, state.buf)
-  vim.api.nvim_win_set_option(state.win, "number", false)
-  vim.api.nvim_win_set_option(state.win, "relativenumber", false)
-  vim.api.nvim_win_set_option(state.win, "wrap", false)
-  
-  -- Show initial "Searching..." message
-  vim.api.nvim_buf_set_option(state.buf, "modifiable", true)
-  vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, { "Searching for: " .. search_term .. "..." })
-  vim.api.nvim_buf_set_option(state.buf, "modifiable", false)
-  
-  return true
-end
-
--- Add a match to the tree during streaming
-function M.add_match(match)
-  if not state.tree_data then
-    return
-  end
-  
-  local tree = require("search-tree.tree")
-  tree.add_match_to_tree(state.tree_data, match)
-  
-  -- Debounced update
-  M.schedule_update()
-end
-
--- Mark search as complete
-function M.search_complete(err, result_count)
-  state.is_searching = false
-  
-  -- Cancel any pending updates
-  if state.update_timer then
-    vim.fn.timer_stop(state.update_timer)
-    state.update_timer = nil
-  end
-  
-  -- Final update
-  M.update_tree()
-  
-  if err then
-    vim.notify("Search error: " .. err, vim.log.levels.ERROR)
-  elseif result_count == 0 then
-    vim.notify("No matches found for: " .. state.search_term, vim.log.levels.INFO)
-  end
 end
 
 -- Create floating window
@@ -275,12 +119,6 @@ end
 
 -- Close tree view
 function M.close()
-  -- Cancel any pending updates
-  if state.update_timer then
-    vim.fn.timer_stop(state.update_timer)
-    state.update_timer = nil
-  end
-  
   if state.win and vim.api.nvim_win_is_valid(state.win) then
     vim.api.nvim_win_close(state.win, true)
   end
@@ -293,7 +131,6 @@ function M.close()
   state.expanded_files = {}
   state.expanded_dirs = {}
   state.line_map = {}
-  state.is_searching = false
 end
 
 -- Toggle expansion (file or directory)
@@ -318,7 +155,7 @@ function M.toggle_expansion()
   end
   
   -- Re-render
-  M.update_tree()
+  M.show_tree(state.tree_data, state.search_term, state.config)
   
   -- Restore cursor position
   vim.api.nvim_win_set_cursor(state.win, { line_num, 0 })
@@ -418,7 +255,7 @@ function M.toggle_all()
   end
   
   -- Re-render
-  M.update_tree()
+  M.show_tree(state.tree_data, state.search_term, state.config)
 end
 
 -- Expand current item
@@ -441,7 +278,7 @@ function M.expand()
   end
   
   -- Re-render
-  M.update_tree()
+  M.show_tree(state.tree_data, state.search_term, state.config)
   vim.api.nvim_win_set_cursor(state.win, { line_num, 0 })
 end
 
@@ -465,7 +302,7 @@ function M.collapse()
   end
   
   -- Re-render
-  M.update_tree()
+  M.show_tree(state.tree_data, state.search_term, state.config)
   vim.api.nvim_win_set_cursor(state.win, { line_num, 0 })
 end
 
@@ -516,24 +353,20 @@ function M.setup_keybindings()
   
   -- Refresh/re-run search
   vim.keymap.set("n", "r", function()
-    -- Re-run search with streaming
+    -- Re-run search
     local search = require("search-tree.search")
+    local tree = require("search-tree.tree")
     
-    -- Reset tree
-    if not M.init_tree_for_streaming(state.search_term, state.config) then
-      return
-    end
-    
-    search.search_async_stream(
-      state.search_term,
-      state.config.ripgrep or {},
-      function(match)
-        M.add_match(match)
-      end,
-      function(err, result_count)
-        M.search_complete(err, result_count)
+    search.search_async(state.search_term, state.config.ripgrep or {}, function(results, err)
+      if err then
+        vim.notify("Search error: " .. err, vim.log.levels.ERROR)
+        return
       end
-    )
+      
+      local tree_structure = tree.build_tree(results)
+      local sorted_tree = tree.sort_tree(tree_structure)
+      M.show_tree(sorted_tree, state.search_term, state.config)
+    end)
   end, opts)
 end
 

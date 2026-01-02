@@ -51,26 +51,41 @@ function M.search(term)
   end
   
   local search = require("search-tree.search")
+  local tree = require("search-tree.tree")
   local ui = require("search-tree.ui")
   
-  -- Initialize UI for streaming
-  if not ui.init_tree_for_streaming(term, config) then
-    return
-  end
-  
-  -- Execute streaming search
-  search.search_async_stream(
-    term,
-    config.ripgrep or {},
-    -- on_result: called for each match as it arrives
-    function(match)
-      ui.add_match(match)
-    end,
-    -- on_complete: called when search finishes
-    function(err, result_count)
-      ui.search_complete(err, result_count)
+  -- Execute async search
+  search.search_async(term, config.ripgrep or {}, function(results, err)
+    if err then
+      vim.notify("Search error: " .. err, vim.log.levels.ERROR)
+      return
     end
-  )
+    
+    if not results or #results == 0 then
+      vim.notify("No matches found for: " .. term, vim.log.levels.INFO)
+      return
+    end
+    
+    -- Build tree structure
+    local tree_structure = tree.build_tree(results)
+    local sorted_tree = tree.sort_tree(tree_structure)
+    
+    -- Check if tree has any content
+    local has_content = false
+    if sorted_tree.sorted_dirs and #sorted_tree.sorted_dirs > 0 then
+      has_content = true
+    elseif sorted_tree.sorted_files and #sorted_tree.sorted_files > 0 then
+      has_content = true
+    end
+    
+    if not has_content then
+      vim.notify("No matches found for: " .. term, vim.log.levels.INFO)
+      return
+    end
+    
+    -- Display tree
+    ui.show_tree(sorted_tree, term, config)
+  end)
 end
 
 return M

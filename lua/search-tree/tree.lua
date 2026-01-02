@@ -62,32 +62,6 @@ local function calculate_counts(node)
   end
 end
 
--- Add a single match to an existing tree structure
-function M.add_match_to_tree(root, match)
-  local file = match.file
-  local parts = vim.split(file, "/", { plain = true })
-  
-  -- Get or create the file node
-  local file_node = get_or_create_node(root, parts, true)
-  
-  -- Add match to file
-  table.insert(file_node.matches, match)
-  file_node.count = file_node.count + 1
-  
-  -- Update counts for all parent directories
-  local current = root
-  for i = 1, #parts - 1 do
-    local part = parts[i]
-    if current.dirs and current.dirs[part] then
-      current = current.dirs[part]
-      current.count = current.count + 1
-    else
-      break
-    end
-  end
-  root.count = root.count + 1
-end
-
 -- Build hierarchical tree structure from flat search results
 function M.build_tree(results)
   local root = {
@@ -99,8 +73,19 @@ function M.build_tree(results)
   }
   
   for _, match in ipairs(results) do
-    M.add_match_to_tree(root, match)
+    local file = match.file
+    local parts = vim.split(file, "/", { plain = true })
+    
+    -- Get or create the file node
+    local file_node = get_or_create_node(root, parts, true)
+    
+    -- Add match to file
+    table.insert(file_node.matches, match)
+    file_node.count = file_node.count + 1
   end
+  
+  -- Calculate counts for all directories
+  calculate_counts(root)
   
   return root
 end
@@ -133,7 +118,7 @@ local function sort_node(node)
   end
 end
 
--- Sort tree structure (can be called incrementally)
+-- Sort tree structure
 function M.sort_tree(root)
   sort_node(root)
   
@@ -149,7 +134,6 @@ function M.sort_tree(root)
     return root
   end
 end
-
 
 return M
 
