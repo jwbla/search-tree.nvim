@@ -97,9 +97,14 @@ end
 
 -- Async search using jobstart
 function M.search_async(term, opts, callback)
+  if vim.fn.executable("rg") ~= 1 then
+    callback({}, "ripgrep (rg) is not installed or not in PATH. Install it from https://github.com/BurntSushi/ripgrep")
+    return
+  end
+
   opts = opts or {}
   local cwd = opts.cwd or vim.fn.getcwd()
-  
+
   -- Build ripgrep command as a string for system() call
   local cmd_parts = { "rg", "--vimgrep", "--no-heading" }
   
@@ -116,11 +121,20 @@ function M.search_async(term, opts, callback)
   if opts.exclude_patterns and #opts.exclude_patterns > 0 then
     for _, pattern in ipairs(opts.exclude_patterns) do
       local rg_pattern = convert_glob_pattern(pattern)
-      table.insert(cmd_parts, "--glob-negate")
+      table.insert(cmd_parts, "--glob")
+      table.insert(cmd_parts, "!" .. rg_pattern)
+    end
+  end
+
+  -- Add include patterns (positive globs act as a whitelist)
+  if opts.include_patterns and #opts.include_patterns > 0 then
+    for _, pattern in ipairs(opts.include_patterns) do
+      local rg_pattern = convert_glob_pattern(pattern)
+      table.insert(cmd_parts, "--glob")
       table.insert(cmd_parts, rg_pattern)
     end
   end
-  
+
   table.insert(cmd_parts, term)
   
   -- Use vim.system if available (Neovim 0.10+), otherwise fall back to jobstart
@@ -132,6 +146,10 @@ function M.search_async(term, opts, callback)
       vim.schedule(function()
         if obj.code == 1 then
           -- No matches
+          callback({}, nil)
+          return
+        elseif obj.code == 2 and (obj.stderr or ""):find("No files were searched") then
+          -- Glob filters excluded everything — treat as no matches
           callback({}, nil)
           return
         elseif obj.code ~= 0 then
@@ -187,6 +205,9 @@ function M.search_async(term, opts, callback)
       
       vim.schedule(function()
         if exit_code == 1 then
+          callback({}, nil)
+        elseif exit_code == 2 and table.concat(stderr, "\n"):find("No files were searched") then
+          -- Glob filters excluded everything — treat as no matches
           callback({}, nil)
         elseif exit_code ~= 0 then
           local error_msg = table.concat(stderr, "\n")
