@@ -31,6 +31,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Extracted config module (`config.lua`) with validation and `vim.tbl_deep_extend` merging
 - Health check module (`:checkhealth search-tree`) for Neovim version, ripgrep, devicons, and config validation
 - Read-only config proxy on `require("search-tree").config`
+- Telescope-style selection line highlight using extmarks with hidden cursor in results pane
+
+### Changed
+
+- Highlight groups now link to standard Neovim groups (`Directory`, `Comment`, `String`, `Normal`) instead of hardcoded catppuccin hex colors; works with any colorscheme
+- Rainbow tree colors link to standard syntax groups (`Statement`, `Type`, `String`, `Function`, `Identifier`, `Special`) instead of hardcoded hex values
+- All highlight groups use `default = true`, allowing user/colorscheme overrides
 
 ### Fixed
 

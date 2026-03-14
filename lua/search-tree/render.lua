@@ -1,16 +1,16 @@
 local M = {}
 
-local RAINBOW_COLORS = {
-  "#f38ba8", -- red
-  "#fab387", -- peach
-  "#f9e2af", -- yellow
-  "#94e2d5", -- teal
-  "#74c7ec", -- sapphire
-  "#cba6f7", -- mauve
+local RAINBOW_LINKS = {
+  "Statement",   -- red-ish
+  "Type",        -- yellow/orange-ish
+  "String",      -- green-ish
+  "Function",    -- cyan/teal-ish
+  "Identifier",  -- blue-ish
+  "Special",     -- purple/mauve-ish
 }
 
 local function rainbow_hl(depth)
-  return string.format("SearchTreeRainbow%d", (depth % #RAINBOW_COLORS) + 1)
+  return string.format("SearchTreeRainbow%d", (depth % #RAINBOW_LINKS) + 1)
 end
 
 -- Apply tree character highlights (rainbow per-depth or flat)
@@ -274,15 +274,16 @@ function M.render_tree(root_node, expanded_files, expanded_dirs, config)
   return lines, highlights, line_map
 end
 
--- Setup syntax highlighting
+-- Setup syntax highlighting (links to standard groups so any colorscheme works)
 function M.setup_highlights()
-  vim.api.nvim_set_hl(0, "SearchTreeTree", { fg = "#585b70" })
-  vim.api.nvim_set_hl(0, "SearchTreeDirectory", { fg = "#89b4fa", bold = true })
-  vim.api.nvim_set_hl(0, "SearchTreeFile", { fg = "#a6e3a1" })
-  vim.api.nvim_set_hl(0, "SearchTreeMatch", { fg = "#cdd6f4" })
-  for i, color in ipairs(RAINBOW_COLORS) do
-    vim.api.nvim_set_hl(0, string.format("SearchTreeRainbow%d", i), { fg = color })
+  vim.api.nvim_set_hl(0, "SearchTreeTree", { default = true, link = "Comment" })
+  vim.api.nvim_set_hl(0, "SearchTreeDirectory", { default = true, link = "Directory" })
+  vim.api.nvim_set_hl(0, "SearchTreeFile", { default = true, link = "String" })
+  vim.api.nvim_set_hl(0, "SearchTreeMatch", { default = true, link = "Normal" })
+  for i, link_group in ipairs(RAINBOW_LINKS) do
+    vim.api.nvim_set_hl(0, string.format("SearchTreeRainbow%d", i), { default = true, link = link_group })
   end
+  vim.api.nvim_set_hl(0, "SearchTreeHiddenCursor", { blend = 100, nocombine = true })
 end
 
 return M

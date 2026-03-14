@@ -26,6 +26,8 @@ local state = {
 }
 
 local preview_ns = vim.api.nvim_create_namespace("search_tree_preview")
+local selection_ns = vim.api.nvim_create_namespace("search_tree_selection")
+local saved_guicursor = nil
 
 -- Forward declarations
 local create_float_layout
@@ -37,6 +39,43 @@ local focus_results
 local execute_search
 
 ------------------------------------------------------------------------
+-- Selection highlight (telescope-style extmarks, no cursor)
+------------------------------------------------------------------------
+local function update_selection()
+  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
+    return
+  end
+  if not state.win or not vim.api.nvim_win_is_valid(state.win) then
+    return
+  end
+  local ok, cursor = pcall(vim.api.nvim_win_get_cursor, state.win)
+  if not ok then
+    return
+  end
+  local row = cursor[1] - 1
+  vim.api.nvim_buf_clear_namespace(state.buf, selection_ns, 0, -1)
+  vim.api.nvim_buf_set_extmark(state.buf, selection_ns, row, 0, {
+    end_line = row + 1,
+    hl_group = "Visual",
+    hl_eol = true,
+  })
+end
+
+local function hide_cursor()
+  if not saved_guicursor then
+    saved_guicursor = vim.o.guicursor
+  end
+  vim.o.guicursor = "a:SearchTreeHiddenCursor"
+end
+
+local function restore_cursor()
+  if saved_guicursor then
+    vim.o.guicursor = saved_guicursor
+    saved_guicursor = nil
+  end
+end
+
+------------------------------------------------------------------------
 -- Close
 ------------------------------------------------------------------------
 function M.close()
@@ -45,6 +84,7 @@ function M.close()
   end
   state.closing = true
 
+  restore_cursor()
   pcall(vim.api.nvim_del_augroup_by_name, "SearchTree")
 
   for _, key in ipairs({ "include_win", "exclude_win", "input_win", "preview_win", "win" }) do
@@ -455,7 +495,27 @@ create_float_layout = function(config)
     group = augroup,
     buffer = state.buf,
     callback = function()
+      update_selection()
       update_preview()
+    end,
+  })
+
+  vim.api.nvim_create_autocmd("WinEnter", {
+    group = augroup,
+    callback = function()
+      if vim.api.nvim_get_current_win() == state.win then
+        hide_cursor()
+        update_selection()
+      end
+    end,
+  })
+
+  vim.api.nvim_create_autocmd("WinLeave", {
+    group = augroup,
+    callback = function()
+      if vim.api.nvim_get_current_win() == state.win then
+        restore_cursor()
+      end
     end,
   })
 
@@ -843,7 +903,7 @@ function M.show_tree(tree_data, search_term, config)
     vim.wo[state.win].number = false
     vim.wo[state.win].relativenumber = false
     vim.wo[state.win].wrap = false
-  end
+    end
 end
 
 ------------------------------------------------------------------------
